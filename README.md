@@ -62,18 +62,17 @@ La estructura principal del proyecto es la siguiente:
 ```text
 TaskFlow/
 ├── assets/
-│   ├── fonts/
-│   └── images/
+├── docs/
+│   └── evidencias/
 ├── src/
 │   ├── app/
 │   │   ├── _layout.tsx
-│   │   ├── index.tsx
-│   │   └── explore.tsx
+│   │   ├── explore.tsx
+│   │   └── index.tsx
 │   ├── components/
-│   │   ├── app-tabs.tsx
-│   │   └── app-tabs.web.tsx
+│   ├── constants/
 │   └── hooks/
-│       └── use-theme.ts
+├── app.json
 ├── package.json
 ├── package-lock.json
 ├── tsconfig.json
@@ -207,7 +206,7 @@ Muestra cómo la aplicación impide guardar una tarea cuando el título está va
 
 El video mostrará el funcionamiento de TaskFlow, incluyendo la creación, edición y eliminación de tareas, el uso de los filtros y la consulta de las estadísticas de progreso.
 
-**Enlace al video:** pendiente de agregar.
+**Enlace al video:** (https://youtu.be/INgNnLUHROU)
 
 ## 12. Uso de herramientas de inteligencia artificial
 
