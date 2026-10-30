@@ -1,180 +1,335 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+type Tarea = {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  completada: boolean;
+};
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
+const CLAVE_ALMACENAMIENTO = "@taskflow/tareas";
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+export default function ProgresoScreen() {
+  const [tareas, setTareas] = useState<Tarea[]>([]);
+  const [cargando, setCargando] = useState(true);
+
+  // Cargar las tareas cada vez que se abre esta pantalla.
+  useFocusEffect(
+    useCallback(() => {
+      let activa = true;
+
+      async function cargarTareas() {
+        try {
+          const datos = await AsyncStorage.getItem(CLAVE_ALMACENAMIENTO);
+
+          if (activa) {
+            setTareas(datos ? JSON.parse(datos) : []);
+          }
+        } catch (error) {
+          console.error("No se pudieron cargar las tareas:", error);
+          if (activa) setTareas([]);
+        } finally {
+          if (activa) setCargando(false);
+        }
+      }
+
+      setCargando(true);
+      cargarTareas();
+
+      return () => {
+        activa = false;
+      };
+    }, []),
+  );
+
+  const total = tareas.length;
+  const completadas = tareas.filter((tarea) => tarea.completada).length;
+  const pendientes = total - completadas;
+  const porcentaje = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+  function obtenerMensaje() {
+    if (total === 0) return "¡Comienza con tu primera tarea!";
+    if (porcentaje === 100) return "¡Excelente! Has completado todo.";
+    if (porcentaje >= 70) return "¡Vas muy bien! Sigue así.";
+    if (porcentaje >= 40) return "¡Buen avance! Continúa paso a paso.";
+    return "Cada pequeño paso cuenta. ¡Tú puedes!";
+  }
+
+  if (cargando) {
+    return (
+      <View style={styles.cargando}>
+        <ActivityIndicator size="large" color="#5965D9" />
+        <Text style={styles.textoCargando}>Cargando tu progreso...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+      style={styles.contenedor}
+      contentContainerStyle={styles.contenido}
+    >
+      <View style={styles.encabezado}>
+        <Text style={styles.marca}>TASKFLOW</Text>
+        <Text style={styles.tituloPrincipal}>Mi progreso</Text>
+        <Text style={styles.subtitulo}>
+          Cada tarea completada es un paso adelante.
+        </Text>
+      </View>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
+      <View style={styles.tarjetaPrincipal}>
+        <Text style={styles.etiquetaProgreso}>TU AVANCE GENERAL</Text>
+        <Text style={styles.porcentaje}>{porcentaje}%</Text>
 
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+        <View
+          style={styles.barraFondo}
+          accessibilityRole="progressbar"
+          accessibilityValue={{
+            min: 0,
+            max: 100,
+            now: porcentaje,
+          }}
+        >
+          <View style={[styles.barraAvance, { width: `${porcentaje}%` }]} />
+        </View>
 
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
+        <Text style={styles.mensaje}>{obtenerMensaje()}</Text>
+      </View>
 
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+      <Text style={styles.tituloSeccion}>Resumen de actividades</Text>
 
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+      <View style={styles.tarjetasResumen}>
+        <View style={styles.tarjetaResumen}>
+          <Text style={styles.numeroTotal}>{total}</Text>
+          <Text style={styles.textoResumen}>Total</Text>
+        </View>
 
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
+        <View style={styles.tarjetaResumen}>
+          <Text style={styles.numeroCompletadas}>{completadas}</Text>
+          <Text style={styles.textoResumen}>Completadas</Text>
+        </View>
+
+        <View style={styles.tarjetaResumen}>
+          <Text style={styles.numeroPendientes}>{pendientes}</Text>
+          <Text style={styles.textoResumen}>Pendientes</Text>
+        </View>
+      </View>
+
+      <View style={styles.tarjetaDetalle}>
+        <Text style={styles.tituloDetalle}>Tu actividad</Text>
+
+        <View style={styles.filaDetalle}>
+          <View style={styles.etiquetaFila}>
+            <View style={styles.puntoCompletadas} />
+            <Text style={styles.textoDetalle}>Tareas completadas</Text>
+          </View>
+          <Text style={styles.valorDetalle}>{completadas}</Text>
+        </View>
+
+        <View style={styles.filaDetalle}>
+          <View style={styles.etiquetaFila}>
+            <View style={styles.puntoPendientes} />
+            <Text style={styles.textoDetalle}>Tareas pendientes</Text>
+          </View>
+          <Text style={styles.valorDetalle}>{pendientes}</Text>
+        </View>
+      </View>
+
+      <View style={styles.pie}>
+        <Text style={styles.textoPie}>TASKFLOW · Un paso a la vez.</Text>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
+  contenedor: {
     flex: 1,
+    backgroundColor: "#F5F7FB",
   },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  contenido: {
+    width: "100%",
+    maxWidth: 850,
+    alignSelf: "center",
+    paddingHorizontal: 22,
+    paddingTop: 35,
+    paddingBottom: 45,
   },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
+  cargando: {
+    flex: 1,
+    backgroundColor: "#F5F7FB",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  titleContainer: {
-    gap: Spacing.three,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
+  textoCargando: {
+    color: "#747D91",
+    marginTop: 12,
+    fontSize: 14,
   },
-  centerText: {
-    textAlign: 'center',
+  encabezado: {
+    marginBottom: 28,
   },
-  pressed: {
-    opacity: 0.7,
+  marca: {
+    color: "#5965D9",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 3,
+    marginBottom: 10,
   },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
+  tituloPrincipal: {
+    color: "#20263A",
+    fontSize: 30,
+    fontWeight: "800",
   },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+  subtitulo: {
+    color: "#747D91",
+    fontSize: 14,
+    marginTop: 7,
   },
-  collapsibleContent: {
-    alignItems: 'center',
+  tarjetaPrincipal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#E9ECF4",
+    marginBottom: 30,
   },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
+  etiquetaProgreso: {
+    color: "#81899B",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.2,
   },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
+  porcentaje: {
+    color: "#5965D9",
+    fontSize: 44,
+    fontWeight: "800",
+    marginTop: 12,
+    marginBottom: 17,
+  },
+  barraFondo: {
+    height: 12,
+    backgroundColor: "#E8EAFE",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  barraAvance: {
+    height: "100%",
+    backgroundColor: "#5965D9",
+    borderRadius: 10,
+  },
+  mensaje: {
+    color: "#747D91",
+    fontSize: 13,
+    marginTop: 16,
+  },
+  tituloSeccion: {
+    color: "#242A3D",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 16,
+  },
+  tarjetasResumen: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 22,
+  },
+  tarjetaResumen: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#E9ECF4",
+    paddingVertical: 19,
+    paddingHorizontal: 5,
+    alignItems: "center",
+  },
+  numeroTotal: {
+    color: "#292F45",
+    fontSize: 25,
+    fontWeight: "800",
+  },
+  numeroCompletadas: {
+    color: "#319A78",
+    fontSize: 25,
+    fontWeight: "800",
+  },
+  numeroPendientes: {
+    color: "#C18431",
+    fontSize: 25,
+    fontWeight: "800",
+  },
+  textoResumen: {
+    color: "#81899B",
+    fontSize: 11,
+    marginTop: 7,
+    textAlign: "center",
+  },
+  tarjetaDetalle: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E9ECF4",
+    padding: 19,
+  },
+  tituloDetalle: {
+    color: "#30364B",
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 20,
+  },
+  filaDetalle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  etiquetaFila: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  puntoCompletadas: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#319A78",
+  },
+  puntoPendientes: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#C18431",
+  },
+  textoDetalle: {
+    color: "#747D91",
+    fontSize: 13,
+  },
+  valorDetalle: {
+    color: "#30364B",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  pie: {
+    alignItems: "center",
+    marginTop: 35,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E9F1",
+  },
+  textoPie: {
+    color: "#969DAE",
+    fontSize: 11,
+    letterSpacing: 1,
   },
 });
